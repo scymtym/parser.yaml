@@ -1117,6 +1117,9 @@
 
 ;;; 8.1.3 Folded Style
 
+;; TODO the whole folded style is very similar to the literal style; a
+;; macro could probably go a long way here.
+
 ;; TODO similar to c-l+literal/helper
 (defun c-l+folded/helper (text position end)
   (let+ (((&values (&optional indent chomping-style) position/new)
@@ -1124,7 +1127,7 @@
                  :start position :end end :junk-allowed t)))
     (if (eql position/new position)
         (values nil position "Failed to parse block-header")
-        (let ((*n*              (+ *n* indent))
+        (let ((*n*              indent #+no (+ *n* indent))
               (*chomping-style* chomping-style))
           (parse 'l-folded-content text
                  :start (or position/new end) :end end :junk-allowed t)))))
@@ -1132,18 +1135,13 @@
     (and c-folded #'c-l+folded/helper)
   (:function second))
 
-#+no (let ((*n* 2))
- (parse 'c-l+folded ">2 #
-     a
-    b
-
-     c
-
-  #
-"))
+(defrule helper-s-nb-folded-text
+    (and ns-char (* nb-char))
+  (:text t))
 
 (defrule s-nb-folded-text
-    (and s-indent ns-char (* nb-char)))
+    (and s-indent helper-s-nb-folded-text)
+  (:function second))
 
 (defun l-nb-folded-lines/helper (text position end)
   (let ((*c* :block-in))
@@ -1153,7 +1151,9 @@
     (and s-nb-folded-text (* (and #'l-nb-folded-lines/helper s-nb-folded-text))))
 
 (defrule s-nb-spaced-text
-    (and s-indent s-white (* nb-char)))
+    (and s-indent s-white (* nb-char))
+  (:function third)
+  (:text t))
 
 (defun b-l-spaced/helper (text position end)
   (let ((*c* :block-in))
@@ -1167,23 +1167,49 @@
 (defrule l-nb-spaced
     (and s-nb-spaced-text b-l-spaced s-nb-spaced-text))
 
+(defrule helper-l-nb-spaced-lines
+    (and b-l-spaced s-nb-spaced-text)
+  (:function second))
+
 (defrule l-nb-spaced-lines
-    (and s-nb-spaced-text (* (and b-l-spaced s-nb-spaced-text))))
+    (and s-nb-spaced-text (* helper-l-nb-spaced-lines))
+  (:destructure (line lines)
+    (list* line lines)))
 
 (defun l-nb-same-lines/helper (text position end)
   (let ((*c* :block-in))
-    (parse '(* l-empty) text
-           :start position :end end :junk-allowed t)))
+    (multiple-value-call #'values
+      (parse '(* l-empty) text
+             :start position :end end :junk-allowed t)
+      t)))
 (defrule l-nb-same-lines
-    (and #'l-nb-same-lines/helper (or l-nb-folded-lines l-nb-spaced-lines)))
+    (and #'l-nb-same-lines/helper (or l-nb-folded-lines l-nb-spaced-lines))
+  (:function second))
+
+(defrule helper-l-nb-diff-lines
+    (and b-as-line-feed l-nb-same-lines)
+  (:function second))
 
 (defrule l-nb-diff-lines
-    (and l-nb-same-lines (* (and b-as-line-feed l-nb-same-lines))))
+    (and l-nb-same-lines (* helper-l-nb-diff-lines))
+  (:destructure (line lines)
+    (list* line lines)))
 
 (defrule l-folded-content
     (and (or (and l-nb-diff-lines b-chomped-last)
              end-block-scalar)
-         l-chomped-empty))
+         l-chomped-empty)
+  (:function first))
+
+(let ((*n* 2))
+  (parse 'c-l+folded ">2 #
+     afanfa
+    bafdasf
+
+     cfdaf
+
+  #
+"))
 
 ;;; 8.2.1 Block Sequences
 
@@ -1222,7 +1248,7 @@
                  :start position :end end :junk-allowed t)))
     (if (eql position/new position)
         (values nil position "Inline indentation expected")
-        (let ((*n* (+ *n* indent 1)))
+        (let ((*n* (+ indent 1) #+no (+ *n* indent 1)))
           (parse '(or ns-l-in-line-sequence ns-l-in-line-mapping) text
                  :start (or position/new end) :end end :junk-allowed t)))))
 (defun s-l+block-indented/helper2 (text position end)
@@ -1234,8 +1260,14 @@
         (and e-node (? s-l-comments) #'s-l+block-indented/helper2
              #+no (recovery (+ n 1)))))
 
+(defrule helper-ns-l-in-line-sequence
+    (and s-indent c-l-block-seq-entry)
+  (:function second))
+
 (defrule ns-l-in-line-sequence
-    (and c-l-block-seq-entry (* (and s-indent c-l-block-seq-entry))))
+    (and c-l-block-seq-entry (* helper-ns-l-in-line-sequnece))
+  (:destructure (entry entries)
+    (list* entry entries)))
 
 ;;; 8.2.2 Block Mappings
 
@@ -1351,13 +1383,18 @@
 (defrule s-l+block-node
     (or s-l+block-in-block s-l+flow-in-block))
 
+(let ((*n* 2) (*c* :block-out))
+  (parse 's-l+block-node "a
+"))
+
 (defun s-l+flow-in-block/helper (text position end)
   (let ((*n* (1+ *n*))
         (*c* :flow-out))
     (parse '(and s-separate ns-flow-node s-l-comments) text
            :start position :end end :junk-allowed t)))
 (defrule s-l+flow-in-block
-    #'s-l+flow-in-block/helper)
+    #'s-l+flow-in-block/helper
+  (:function second))
 
 (defrule s-l+block-in-block
     (or s-l+block-scalar s-l+block-collection))
@@ -1371,6 +1408,12 @@
     (and #'s-l+block-scalar/helper (or c-l+literal c-l+folded)))
 
 (let ((*n* 2) (*c* :block-in))
+  (parse 's-l+block-scalar "!foo
+   >
+   a
+"))
+
+(let ((*n* 2) (*c* :block-in))
  (parse 's-l+block-scalar " !foo
    |
    a
@@ -1378,24 +1421,19 @@
 
 (defun s-l+block-collection/helper1 (text position end)
   (let ((*n* (1+ *n*)))
-    (multiple-value-call #'values
-      (parse '(and s-separate c-ns-properties (& s-l-comments)) text
-             :start position :end end :junk-allowed t)
-      t)))
+    (parse '(and (? (and s-separate c-ns-properties)) s-l-comments) text
+           :start position :end end :junk-allowed t)))
 (defun s-l+block-collection/helper2 (text position end)
-  (let ((*n* (seq-spaces)))
+  (let ((*n* (ecase *c*
+               (:block-out (1- *n*))
+               (:block-in  *n*))))
     (multiple-value-call #'values
       (parse 'l+block-sequence text
              :start position :end end :junk-allowed t)
       t)))
 (defrule s-l+block-collection
-    (and (? #'s-l+block-collection/helper1) s-l-comments
+    (and #'s-l+block-collection/helper1 s-l-comments
          (or #'s-l+block-collection/helper2 l+block-mapping)))
-
-(defun seq-spaces ()
-  (ecase *c*
-    (:block-out (1- *n*))
-    (:block-in  *n*)))
 
 ;;; 9.1.1 Document Prefix
 
