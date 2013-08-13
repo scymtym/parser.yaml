@@ -830,9 +830,15 @@
     (and c-mapping-start (? s-separate) #'c-flow-mapping/helper c-mapping-end)
   (:function third))
 
+(defrule helper-ns-s-flow-map-entries
+    (and c-collect-entry (? s-separate) (? ns-s-flow-map-entries))
+  (:function third))
+
 (defrule ns-s-flow-map-entries
-    (and ns-flow-map-entry (? s-separate)
-         (? (and c-collect-entry (? s-separate) (? ns-s-flow-map-entries)))))
+    (and ns-flow-map-entry (? s-separate) (? helper-ns-s-flow-map-entries))
+  (:destructure (entry separator entries)
+    (declare (ignore separator))
+    (list* entry entries)))
 
 (defrule ns-flow-map-entry
     (or (and c-mapping-key s-separate ns-flow-map-explicit-entry)
@@ -1214,13 +1220,16 @@
 ;;; 8.2.1 Block Sequences
 
 (defrule detect-collection-indentation
-    (& (and (* (non-empty? l-comment)) count-spaces))
-  (:destructure (comments spaces)
-    (declare (ignore comments))
-    (- spaces *n*)))
+    (& (and (* (not-null? l-comment)) count-spaces))
+  (:function second))
 
 (defrule detect-inline-indentation
     (& count-spaces))
+
+(assert (= 3 (let ((*n* 1))
+               (parse 'detect-collection-indentation "   #
+
+  -" :junk-allowed t))))
 
 (defun l+block-sequence/helper (text position end)
   (let+ (((&values indent position/new)
@@ -1277,13 +1286,14 @@
   (let+ (((&values indent position/new)
           (parse 'detect-collection-indentation text
                  :start position :end end :junk-allowed t)))
-    (if (eql position/new position)
+    (if nil #+no (eql position/new position)
         (values nil position "Collection indentation expected")
         (let ((*n* (+ *n* indent)))
           (parse '(and s-indent (+ ns-l-block-map-entry)) text
                  :start (or position/new end) :end end :junk-allowed t)))))
 (defrule l+block-mapping
-    #'l+block-mapping/helper)
+    #'l+block-mapping/helper
+  (:function second))
 
 (defrule ns-l-block-map-entry
   (or c-l-block-map-explicit-entry ns-l-block-map-implicit-entry))
@@ -1304,15 +1314,12 @@
     (parse 's-l+block-indented text
            :start position :end end :junk-allowed t)))
 (defrule l-block-map-explicit-value
-    (and s-indent c-mapping-value #'l-block-map-explicit-value/helper))
-
-#+no (parse 'ns-l-block-map-implicit-entry "language: c")
+    (and s-indent c-mapping-value #'l-block-map-explicit-value/helper)
+  (:function third))
 
 (defrule ns-l-block-map-implicit-entry
     (and (or ns-s-block-map-implicit-key e-node)
          c-l-block-map-implicit-value))
-
-#+no (parse 'ns-s-block-map-implicit-key "language")
 
 (defun ns-s-block-map-implicit-key/helper (text position end)
   (let ((*c* :block-key))
@@ -1336,7 +1343,8 @@
 (defrule c-l-block-map-implicit-value
     (and c-mapping-value
          (or #'c-l-block-map-implicit-value/helper1
-             (and e-node s-l-comments #'c-l-block-map-implicit-value/helper2))))
+             (and e-node s-l-comments #'c-l-block-map-implicit-value/helper2)))
+  (:function second))
 
 (defrule helper-ns-l-in-line-mapping
     (and s-indent ns-l-block-map-entry)
@@ -1383,10 +1391,6 @@
 (defrule s-l+block-node
     (or s-l+block-in-block s-l+flow-in-block))
 
-(let ((*n* 2) (*c* :block-out))
-  (parse 's-l+block-node "a
-"))
-
 (defun s-l+flow-in-block/helper (text position end)
   (let ((*n* (1+ *n*))
         (*c* :flow-out))
@@ -1402,22 +1406,12 @@
 
 (defun s-l+block-scalar/helper (text position end)
   (let ((*n* (1+ *n*)))
-    (parse '(and s-separate (? (and c-ns-properties s-separate))) text
-           :start position :end end :junk-allowed t)))
+    (multiple-value-call #'values
+      (parse '(and s-separate (? (and c-ns-properties s-separate))) text
+             :start position :end end :junk-allowed t)
+      t)))
 (defrule s-l+block-scalar
     (and #'s-l+block-scalar/helper (or c-l+literal c-l+folded)))
-
-(let ((*n* 2) (*c* :block-in))
-  (parse 's-l+block-scalar "!foo
-   >
-   a
-"))
-
-(let ((*n* 2) (*c* :block-in))
- (parse 's-l+block-scalar " !foo
-   |
-   a
-"))
 
 (defun s-l+block-collection/helper1 (text position end)
   (let ((*n* (1+ *n*)))
@@ -1434,6 +1428,36 @@
 (defrule s-l+block-collection
     (and #'s-l+block-collection/helper1 s-l-comments
          (or #'s-l+block-collection/helper2 l+block-mapping)))
+
+(let ((*n* -1))
+  (parse 'l+block-mapping "a:
+b:
+"))
+
+(parse 'ns-l-block-map-implicit-entry "language: c")
+
+(parse 'ns-s-block-map-implicit-key "language")
+
+(let ((*n* 2) (*c* :block-in))
+  (parse 's-l+block-node "|
+   a
+"))
+
+(let ((*n* 2) (*c* :block-out))
+  (parse 's-l+block-node "a
+"))
+
+(let ((*n* 2) (*c* :block-in))
+  (parse 's-l+block-scalar "!foo
+   >
+   a
+"))
+
+(let ((*n* 2) (*c* :block-in))
+  (parse 's-l+block-scalar " !foo
+   |
+   a
+"))
 
 ;;; 9.1.1 Document Prefix
 
