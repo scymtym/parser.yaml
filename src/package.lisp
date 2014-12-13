@@ -4,4 +4,6 @@
    #:alexandria
    #:let-plus
 
+   #:builder-protocol
+
    #:esrap))

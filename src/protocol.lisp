@@ -1,6 +1,6 @@
 ;;;; protocol.lisp --- Protocol functions used by the parser.yaml system.
 ;;;;
-;;;; Copyright (C) 2013 Jan Moringen
+;;;; Copyright (C) 2013, 2014 Jan Moringen
 ;;;;
 ;;;; Author: Jan Moringen <jmoringe@techfak.uni-bielefeld.de>
 
@@ -44,32 +44,3 @@
                   (rule 'cmake))
   (let ((*builder* builder))
     (esrap:parse rule source)))
-
-;;; Builder Protocol
-
-(defgeneric make-node (builder kind &rest args &key &allow-other-keys)
-  (:documentation
-   "Construct and return a node representing TODO Typical properties in ARGS are
-
-      :name   (COMPONENT1 COMPONENT2 ...)
-      :value  STRING                      ; only when KIND is :option
-      :bounds (START . END)
-
-    ."))
-
-(defgeneric finish-node (builder node)
-  (:documentation
-   "TODO"))
-
-(defgeneric relate (builder relation left right)
-  (:documentation
-   "Establish RELATION between nodes LEFT and RIGHTT and return the
-    resulting modified LEFT node (or an appropriate fresh object).
-
-    A typical case would RELATION being :child, LEFT being the parent
-    node and RIGHT being the child node."))
-
-;; Default behavior
-
-(defmethod finish-node ((builder t) (node t))
-  node)

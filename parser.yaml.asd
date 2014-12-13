@@ -44,18 +44,17 @@
   :description "Provides parsing of YAML documents."
   :depends-on  (:alexandria
                 #+not-yet :split-sequence
-                (:version :let-plus        "0.2")
+                (:version :let-plus                      "0.2")
                 #+not-yet (:version :more-conditions "0.1.0")
 
+                (:version :architecture.builder-protocol "0.1")
                 :esrap)
   :components  ((:module     "src"
                  :serial     t
                  :components ((:file       "package")
                               #+not-yet (:file       "conditions")
-                              (:file       "variables")
                               (:file       "protocol")
-                              (:file       "grammar")
-                              (:file       "list-builder"))))
+                              (:file       "grammar"))))
   :in-order-to ((test-op (test-op :parser.yaml-test))))
 
 (defsystem :parser.yaml-test
