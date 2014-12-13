@@ -1,6 +1,6 @@
 ;;;; parser.yaml.asd --- System definition for the parser.yaml system.
 ;;;;
-;;;; Copyright (C) 2012, 2013 Jan Moringen
+;;;; Copyright (C) 2012, 2013, 2014 Jan Moringen
 ;;;;
 ;;;; Author: Jan Moringen <jmoringe@techfak.uni-bielefeld.de>
 
@@ -40,7 +40,7 @@
   :author      "Jan Moringen <jmoringe@techfak.uni-bielefeld.de>"
   :maintainer  "Jan Moringen <jmoringe@techfak.uni-bielefeld.de>"
   :version     #.(version/string)
-  :license     "LLGPLv3; see COPYING file for details."
+  :license     "LLGPLv3" ; see COPYING file for details
   :description "Provides parsing of YAML documents."
   :depends-on  (:alexandria
                 #+not-yet :split-sequence
@@ -62,7 +62,7 @@
   :author      "Jan Moringen <jmoringe@techfak.uni-bielefeld.de>"
   :maintainer  "Jan Moringen <jmoringe@techfak.uni-bielefeld.de>"
   :version     #.(version/string)
-  :license     "LLGPLv3; see COPYING for details."
+  :license     "LLGPLv3" ; see COPYING for details
   :description "Unit tests for the parser.yaml system."
   :depends-on  (:alexandria
                 :let-plus
