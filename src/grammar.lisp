@@ -312,9 +312,6 @@
 (defrule s-indent #'parse-s-indent
   (:function length))
 
-(let ((*n* 4))
-  (parse 's-indent "    "))
-
 (defun parse-s-indent-lt (text position end)
   (if (< *n* 1)
       (values nil nil "Current indent is negative")
@@ -335,40 +332,11 @@
 (defrule s-indent-le #'parse-s-indent-le
   (:function length))
 
-(parse '(and (* s-space 0 0) #\Newline) "
-")
-
-#+no (let ((*n* 4) (*c* :flow-in))
-  (parse 's-indent-lt "
-"))
-(let ((*n* 3))
-  #+no (parse 's-indent-lt "
-")
-  (parse 's-indent-lt "")
-  (parse 's-indent-lt " ")
-  (parse 's-indent-lt "  "))
-(handler-case
-    (let ((*n* 0))
-      (parse 's-indent-lt "")
-      (assert nil))
-  (error ()))
-(handler-case
-    (let ((*n* -1))
-      (parse 's-indent-lt "")
-      (assert nil))
-  (error ()))
-
 ;;; 6.2 Separation Spaces
 
 (defrule s-separate-in-line
     (or (+ s-white) start-of-line)
   (:constant nil))
-
-(parse 's-separate-in-line "
-" :start 1)
-(parse 's-separate-in-line "
-    " :start 1)
-(parse 's-separate-in-line "   ")
 
 ;;; 6.3 Line Prefixes
 
@@ -394,8 +362,6 @@
 (defrule l-empty
     (and (or s-line-prefix s-indent-lt) b-as-line-feed))
 
-#+no (parse 'l-empty "")
-
 ;;; 6.5 Line Folding
 
 (defrule b-l-trimmed
@@ -407,35 +373,12 @@
 (defrule b-l-folded
     (or b-l-trimmed b-as-space))
 
-(let ((*n* 4) (*c* :flow-in))
-  (parse '(and s-indent-lt b-as-line-feed) "
-"))
-
-(let ((*n* 4) (*c* :flow-in))
- (parse 'b-l-folded " a
-
-" :start 2))
-
 (defun parse-s-flow-folded (text position end)
   (let ((*c* :flow-in))
     (parse '(and (? s-separate-in-line) b-l-folded s-flow-line-prefix)
            text :start position :end end :junk-allowed t)))
 (defrule s-flow-folded
     #'parse-s-flow-folded)
-
-(let ((*n* 4))
-  (parse 's-flow-folded " a
-
-        " :start 2 :junk-allowed t))
-
-(let ((*n* 4))
-  (parse 's-flow-folded " a
-
-        " :start 2))
-
-(let ((*n* 4) (*c* :flow-out))
-  (parse 's-flow-folded " a
-        a b	c " :start 2 :junk-allowed t))
 
 ;;; 6.6 Comments
 
@@ -477,13 +420,6 @@
 (defrule s-separate-lines
     (or (and s-l-comments s-flow-line-prefix) s-separate-in-line))
 
-
-(let ((*n* 4) (*c* :flow-out))
-  (parse 's-separate ""))
-
-(let ((*n* 4))
-  (parse 's-separate-lines ""))
-
 ;;; 6.8 Directives
 
 (defrule l-directive
@@ -511,8 +447,6 @@
 (defrule ns-directive-parameter
     (+ ns-char)
   (:text t))
-
-#+no (parse 'ns-reserved-directive "name value1 value2")
 
 ;;; 6.8.1 Yaml Directives
 
@@ -673,22 +607,6 @@
 (defrule nb-double-multi-line
     (and nb-ns-double-in-line (or s-double-next-line (* s-white))))
 
-(let ((*n* 4) (*c* :flow-out))
-  (parse 'nb-double-multi-line " a
-        a b	c "))
-
-(let ((*n* 4) (*c* :flow-out))
-  (parse 's-flow-folded " a
-        a b	c " :start 2 :junk-allowed t))
-
-(let ((*n* 4) (*c* :flow-out))
-  (parse 's-separate-in-line " a
-        a b	c " :start 2 :junk-allowed t))
-
-(let ((*n* 4) (*c* :flow-out))
-  (parse 'c-double-quoted "\" a
-        a b	c \""))
-
 ;;; 7.3.2 Single Quoted Style
 
 (defrule c-quoted-quote
@@ -777,23 +695,6 @@
 
 (defrule ns-plain-multi-line
     (and ns-plain-one-line (* s-ns-plain-next-line)))
-
-(let ((*c* :block-key))
-  (parse 'ns-plain "language"))
-
-(let ((*n* 4) (*c* :flow-key))
-  (parse 'ns-plain "a   \" :# () b"))
-
-(parse 'ns-plain-first ":a" :junk-allowed t)
-
-(handler-case
-    (let ((*c* :flow-in))
-      (parse 'ns-plain-char " ")
-      (assert nil))
-  (error ()))
-
-#+no (let ((*n* 1) (*c* :flow-key))
-  (parse 'ns-plain ": "))
 
 ;;; 7.4 Flow Collection Styles
 
@@ -933,25 +834,6 @@
         (and c-ns-properties
              (or (and s-separate ns-flow-content)
                  e-scalar))))
-
-(let ((*c* :block-key))
-  (parse 'ns-flow-yaml-node ":language"))
-
-(let ((*n* 4) (*c* :flow-in))
-  (parse 'c-flow-json-node "!t \"a\""))
-
-(let ((*n* 4) (*c* :flow-in))
-  (parse 'ns-s-flow-map-entries "\"a\":b,? c,: d,e"))
-
-(let ((*n* 4) (*c* :flow-in))
-  (parse 'ns-flow-map-entry "\"a\":b"))
-
-(let ((*c* :block-key))
-  (parse 'ns-s-implicit-yaml-key "language"))
-(let ((*n* 4) (*c* :flow-in))
-  (parse 'c-flow-mapping "{\"a\":b,? c,: d,e}"))
-(let ((*n* 4) (*c* :flow-in))
-  (parse 'ns-s-flow-map-entries "\"a\":b,? c,: d,e"))
 
 ;;; 8.1.1 Block Scalar Headers
 
@@ -1096,31 +978,6 @@
          l-chomped-empty)
   (:function first))
 
-(let ((*n* 2))
-  (parse 'c-l+literal "|-
-    # afdaf
-    bfdas
-      #cfdsa
-
-
-  #
-")
-  (parse 'c-l+literal "|-2
-    # a
-    b
-      #c
-
-
-  #
-"))
-
-(parse 'c-l+literal "|+
-  bla")
-(let ((*n* 2) (*chomping-style* :clip))
-  (parse 'l-literal-content "  bla"))
-(let ((*n* 2) (*chomping-style* :clip))
-  (parse 'l-nb-literal-text "  bla"))
-
 ;;; 8.1.3 Folded Style
 
 ;; TODO the whole folded style is very similar to the literal style; a
@@ -1207,16 +1064,6 @@
          l-chomped-empty)
   (:function first))
 
-(let ((*n* 2))
-  (parse 'c-l+folded ">2 #
-     afanfa
-    bafdasf
-
-     cfdaf
-
-  #
-"))
-
 ;;; 8.2.1 Block Sequences
 
 (defrule detect-collection-indentation
@@ -1225,11 +1072,6 @@
 
 (defrule detect-inline-indentation
     (& count-spaces))
-
-(assert (= 3 (let ((*n* 1))
-               (parse 'detect-collection-indentation "   #
-
-  -" :junk-allowed t))))
 
 (defun l+block-sequence/helper (text position end)
   (let+ (((&values indent position/new)
@@ -1279,8 +1121,6 @@
     (list* entry entries)))
 
 ;;; 8.2.2 Block Mappings
-
-#+no (parse 'ns-l-block-map-entry "language: c")
 
 (defun l+block-mapping/helper (text position end)
   (let+ (((&values indent position/new)
@@ -1429,36 +1269,6 @@
     (and #'s-l+block-collection/helper1 s-l-comments
          (or #'s-l+block-collection/helper2 l+block-mapping)))
 
-(let ((*n* -1))
-  (parse 'l+block-mapping "a:
-b:
-"))
-
-(parse 'ns-l-block-map-implicit-entry "language: c")
-
-(parse 'ns-s-block-map-implicit-key "language")
-
-(let ((*n* 2) (*c* :block-in))
-  (parse 's-l+block-node "|
-   a
-"))
-
-(let ((*n* 2) (*c* :block-out))
-  (parse 's-l+block-node "a
-"))
-
-(let ((*n* 2) (*c* :block-in))
-  (parse 's-l+block-scalar "!foo
-   >
-   a
-"))
-
-(let ((*n* 2) (*c* :block-in))
-  (parse 's-l+block-scalar " !foo
-   |
-   a
-"))
-
 ;;; 9.1.1 Document Prefix
 
 (defrule l-document-prefix
@@ -1535,21 +1345,3 @@ b:
                                             (or end-of-file l-any-document))
                                        (and (* (non-empty? l-document-prefix))
                                             (? l-explicit-document)) )))))
-
-#+no (parse 's-l+block-node
-       "language: c
-compiler:
-  - gcc
-  - clang
-# Change this to your needs
-script: ./configure && make
-")
-
-#+no (parse 'l-yaml-stream
-       "language: c
-compiler:
-  - gcc
-  - clang
-# Change this to your needs
-script: ./configure && make
-")
